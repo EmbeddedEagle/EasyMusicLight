@@ -287,6 +287,7 @@ void TaskFFT( void *pvParameters __attribute__((unused)) )  // This is a Task.
           fft_cb[i] = 0;
           fft_rb[i] = sound_rb[i];
         }
+        xSemaphoreGive(sem_fft_done);
 
         fix_fft(fft_rb,fft_cb,6,0);
 
@@ -329,7 +330,6 @@ void TaskFFT( void *pvParameters __attribute__((unused)) )  // This is a Task.
         }
         
         xSemaphoreGive(sem_led_ready);
-        xSemaphoreGive(sem_fft_done);
       }
       else
       {
