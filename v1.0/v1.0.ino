@@ -4,10 +4,11 @@
 // Version: V1.0
 //
 // About: This is the eighth versin for the code of the project 
-// in embedded systems (see: Manuel Remmele project approach.pdf)
+// in embedded systems (see: Manuel Remmele Final Project Report.pdf)
 //
-// Versin discription: This version includes color changing 
-// with the buttons along with several modes.
+// Versin discription: This version has pressents a working RTOS 
+// framework, 4 different modes (FFT, Amplitude, color and Xmas) and 
+// stores the settings in the EEPROM.
 ///////////////////////////////////////////////////////////////////// 
 
 
@@ -21,6 +22,7 @@
 #ifdef __AVR__
   #include <avr/power.h>
 #endif
+#include <EEPROM.h>
 
 
 // semaphores
@@ -57,12 +59,13 @@ uint8_t Bt1_state = 0;
 uint8_t Bt2_state = 0;
 uint8_t Bt3_state = 0;
 uint8_t Button_states = 0;
-uint8_t mode = 0;
+uint8_t mode;
 #define MODES 4 //how many modes are there
 
 
 //color
 uint8_t HSV[] = {155,0,0};
+uint8_t HSV_old[] = {155,0,0};
 
 
 
@@ -79,9 +82,7 @@ const TickType_t xDelay = 3000 / portTICK_PERIOD_MS;
 
 ////////////////////////////////////////////////////////////////////////////////
 void setup() {
-
   // WS2812b
-  Serial.begin(9600);
   pixels.begin();
 
   // ADC interrupt
@@ -126,6 +127,12 @@ void setup() {
 
 
 
+  //load HSV values from EEPROM
+  for (uint8_t i = 0; i < 3; i++){
+    HSV[i] = EEPROM.read(i);
+    HSV_old[i] = HSV[i];
+  }
+  mode = EEPROM.read(4);
 
 
   // Tasks
@@ -287,7 +294,6 @@ void TaskFFT( void *pvParameters __attribute__((unused)) )  // This is a Task.
           fft_cb[i] = 0;
           fft_rb[i] = sound_rb[i];
         }
-        xSemaphoreGive(sem_fft_done);
 
         fix_fft(fft_rb,fft_cb,6,0);
 
@@ -330,6 +336,7 @@ void TaskFFT( void *pvParameters __attribute__((unused)) )  // This is a Task.
         }
         
         xSemaphoreGive(sem_led_ready);
+        xSemaphoreGive(sem_fft_done);
       }
       else
       {
@@ -354,6 +361,7 @@ void TaskSettings( void *pvParameters __attribute__((unused)) )
       if (mode >= MODES){
         mode = 0;
       }
+      EEPROM.write(4, mode);
     }
     Bt0_state = state;
 
@@ -372,7 +380,7 @@ void TaskSettings( void *pvParameters __attribute__((unused)) )
         HSV[1] = HSV[1]<<1;
         HSV[1] = HSV[1]+1;
       }else{
-        if (state != Bt1_state){
+        if (state != Bt2_state){
           HSV[1] = 0;
         }
       }
@@ -394,8 +402,13 @@ void TaskSettings( void *pvParameters __attribute__((unused)) )
     }
     Bt3_state = state;
 
-
-
+    for (uint8_t i = 0; i < 3; i++){
+      if (HSV[i] != HSV_old[i]){
+        EEPROM.write(i, HSV[i]);
+        HSV_old[i] = HSV[i];
+      }
+    }
+    
     vTaskDelay( 100 / portTICK_PERIOD_MS );
   }
 }
